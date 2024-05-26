@@ -10,7 +10,7 @@ export default function Home() {
       <ul>
         <li><Link href="./yfx">yfx</Link></li>
         <li><Link href="./taupro">tau-prolog</Link></li>
-        <li><Link href="/my-nextjs-app2/my-mdx-page">mdx test</Link></li>
+        <li><Link href="./my-mdx-page">mdx test</Link></li>
       </ul></div>
       <div className={styles.description}>
         <p>
