@@ -1,0 +1,23 @@
+.loading-skeleton {
+  display: flex;
+  justify-content: center;
+}
+
+.loading-skeleton__text {
+  width: 80%;
+  height: 16px;
+  border-radius: 2px;
+  background-color: #eaeaea;
+  margin-bottom: 8px;
+  animation: loading-skeleton 1.5s ease-in-out infinite;
+}
+
+/* Add keyframe animation for the skeleton effect */
+@keyframes loading-skeleton {
+  0% {
+    background-position: -100%;
+  }
+  100% {
+    background-position: 100%;
+  }
+}
