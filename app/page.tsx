@@ -8,9 +8,9 @@ export default function Home() {
       <h2>Header</h2>
       <div>
       <ul>
-        <li><Link href="/yfx">yfx</Link></li>
-        <li><Link href="/taupro">tau-prolog</Link></li>
-        <li><Link href="/my-mdx-page">mdx test</Link></li>
+        <li><Link href="./yfx">yfx</Link></li>
+        <li><Link href="./taupro">tau-prolog</Link></li>
+        <li><Link href="/my-nextjs-app2/my-mdx-page">mdx test</Link></li>
       </ul></div>
       <div className={styles.description}>
         <p>
@@ -25,7 +25,7 @@ export default function Home() {
           >
             By{" "}
             <Image
-              src="/vercel.svg"
+              src="/my-nextjs-app2/vercel.svg"
               alt="Vercel Logo"
               className={styles.vercelLogo}
               width={100}
@@ -39,7 +39,7 @@ export default function Home() {
       <div className={styles.center}>
         <Image
           className={styles.logo}
-          src="/next.svg"
+          src="/my-nextjs-app2/next.svg"
           alt="Next.js Logo"
           width={180}
           height={37}
