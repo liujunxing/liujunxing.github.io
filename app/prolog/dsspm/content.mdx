@@ -1,11 +1,410 @@
 
-# Document Information
+READ: Design and Simulation of a Sequential Prolog Machine
 
-URL: [Design and Simulation of a Sequential Prolog Machine](https://www.softwarepreservation.org/projects/prolog/edinburgh/doc/Clocksin-Design_and_Simulation_of_a_SPM-1984.pdf) \
+
+# Paper Information
+
+Title: [Design and Simulation of a Sequential Prolog Machine](https://www.softwarepreservation.org/projects/prolog/edinburgh/doc/Clocksin-Design_and_Simulation_of_a_SPM-1984.pdf/view) \
 Author: W F Clocksin \
 Keywords: Prolog, sequential inference machine, compiler, virtual machine
 
-# TODO: 
 
-notes here ...
 
+# ABSTRACT 
+
+Prolog-X: portable, incrementally compiled, "ZIP" virtual machine. \
+Several novel techniques: the representation of the `recordx` database, the selection of clauses, and the compilation of arithmatic expressions.
+
+
+# 1. Introduction
+
+ZIP: an abstract Prolog machine. (motivation & key principles refs to: (Clocksin and Mellish, 1981) and (Yokota 1983)).
+
+Design requirements:
+* portable 
+* compatible ...  (Warren 1979)
+* high-performance (for large-scale applications)
+
+These conflicting requirements have led to the design of a system which is a reasonable compromise(折衷,妥协). \
+The ZIP machine is the basis of the prolog-x system.
+
+Prolog-X contains a resident compiler which `incrementally` compiles Prolog clauses into bytecodes ...,
+ emulated by software ...,  runs at a speed similar to purpose-built Prolog interpreters, ...
+
+Fundamental principles guided design:
+* (data & code) compact representations will improve locality, with caches and paging.
+* to use low-overhead implementation techniques which "scale up" well for large applications. (?递增编译)
+
+The ZIP machine uses a similar principle of operation as the DECsystem-10 Prolog system of Warren (1977,1980,1983) (继承,参考)
+
+Differences:
+* use structure-copying (instead of structure-sharing) for constructing compound-terms  (需深入了解)
+* choice-points are created only when required
+* globalize var only-if-required at run-time (instead of compile-time)
+* detect determinate as early as possible
+
+Removed restrictions (of DEC-10 prolog):
+* The user perceives no difference between compiled clauses and interpreted clauses (except for performance).  (?反编译)
+* Database references from one clause to another are permitted. 
+
+
+The ZIP machine is defined by a word format, a set of registers, the format of storage 
+areas, an instruction set, and assumptions about the layout of data structures in memory. 
+ (几部分: 字格式, 寄存器, 存储区, 指令集, 结构)
+In the Prolog-X system, a resident compiler (written in Prolog) incrementally compiles clauses 
+ into a compact bytecode sequence.  (递增编译为紧凑的字节码)
+
+The bytecode emulator consists of a number of small routines that define the different operations. 
+ (字节码解释由一组小函数执行)
+Some instructions can be executed in three different modes, so there is a separate routine for each mode. 
+ (有三种不同 mode, ...对应不同的 routine)
+The second (and current) version of Prolog-X is a translation of the first version into the C language. (当前版本是 C 语言的)
+
+
+# 2. Data Words
+
+Every data structure is represented by a (t + v)-bit word which is divided into 
+a tag field of t bits in length, and a val field of v bits in length. 
+ (数据用一个字分为 tag+value 两部分 bits 表示)
+Prolog-X uses a 4-bit tag and 28-bit val.
+
+The 16 primitive tagged objects:
+ INT,FLOAT,BOX,ATOM,TERM,CONS,LINK,UNDEF,FUNCTOR,BLOCK,EMPTY,TERMIN,CLAUSE,TABLE,TABREF,PROC.
+ (分多种, 主要关注 atom,int,term,ref 几种;  参见 Warren)
+
+To represent a list cell, a CONS-tagged word points to a cell of two words, which correspond to 
+the head and tail of a list. 
+ (列表的紧凑表示. 另一种是通用 functor,head,tail 表示)
+Some of the above tags are not strictly necessary.  (部分 tag 不是必须, 可选其它方式)
+
+
+# 3. Layout of Data Object Cells
+
+`LINK` pointers are allowed to point directly to words within a cell. 
+a functor of arity O is consistently represented as an atom, ... (即 tag=ATOM)
+Any unused component of a cell is occupied by a TERMIN word.  (?即 nil)
+
+(以下给出了 atom, functor, proc 等的结构, 相当于 C struct 细节略...)
+
+
+# 4. Registers
+
+The current state of a computation is contained in a set of registers...  (寄存器列表)
+The registers having contents valid at all times are:
+
+* PM   processor mode            (处理模式, ARG,MATCH,COPY)
+* XC   current clause pointer
+* D    current data pointer
+* PC   current program pointer
+* L    current (target) local frame
+* CL   current (source) local frame
+* CP   forward continuation program counter
+* CL0  forward continuation local frame
+* G    global stack allocated top
+* G0   global stack committed top
+* H    heap freelist
+* BL   backtrack continuation local frame
+* BG   backtrack global stack top
+* BP   backtrack continuation clause
+* TR   trail allocated top
+* TR0  trail committed top
+
+Some of the above registers are redundant in that they are caches for slots in the current local frame. (缓存目的)
+
+
+# 5. Storage Allocation
+
+Storage is allocated in four main areas, (四个主要内存区域)
+
+* Activation records are allocated on the Local stack.  (活动记录)
+ Variable slots are not initialised upon activation, because the first use of a variable is identified by the compiler,  (编译器知道变量槽使用时机, 产生对应指令)
+* The Global stack, in which most temporary data structures are allocated,  ... 
+* Persistent data. structures are allocated in the Heap, as a heap ...    (长期数据在堆上分配, 如 atom,proc,clause 等)
+ registers PC, CP, XC, and BP point into it.   (这几个寄存器指向 Heap 区)
+* The Trail is an historical record of variable instantiations. ...
+
+In addition, the ZIP machine uses a small scratchpad stack when executing arithmetic instructions, 
+ and when executing code between the `functor` and `pop` instructions.  (一个小的辅助栈)
+
+Local stack frames, called activation records, are offset from register CL.
+ ... registers CP, CL0, XC, and G0 are saved to or restored from CL. 
+An activation record laid out as:
+  
+```
+          (reserved)
+  continuation program counter    CP
+  continuation local stack frame 
+  backtrack clause pointer
+  global stack pointer
+  backtrack local stack pointer 
+  trail pointer 
+  current clause pointer 
+  (argument and local variables)     数量根据子句不同
+  (temporary local variables)
+```
+The argument slots hold the actual parameters of the procedure call. 
+If a variable appears at the top-level in the head of a clause, then its value is simply that of
+ the corresponding actual parameter, and there is no need to allocate a variable slot for it. 
+ (变量与参数重叠, 不用单独分配, 这样可节省空间)
+
+Locals classified by the compiler as temporaries are allocated nearest the 
+ top of the stack, so that the stack space occupied by temporaries can be recovered 
+ automatically when the neck of a clause is executed.  (优化: 临时的局部变量分配及...)
+
+
+# 6. ZIP Instructions  指令集
+
+A complete list of the ZIP instructions is given in the Appendix. 
+
+Processor Modes: `ARG`, `COPY`, or `MATCH`.
+Many of the instructions described here have alternative interpretations depending on the current Processor Mode. 
+ (很多指令根据 PM 解释/执行不同)
+Arguments, if any, follow in the subsequent zero, one, or two bytes.  (指令可能有 0,1,2 个字节的参数)
+
+The instructions described here are generated by an optimising compiler written in Prolog, ...
+ (这些指令由 优化编译器 生成...)
+The compiler is capable of identifying cases   (编译器识别多种情况)
+* where full unification is not required,                   (完整的合一调用)
+* where data structures should migrate to other areas,      (? )
+* where tail recursion is used,                             (尾递归)
+* where unit and doublet clauses require less housekeeping,   (fact & ?桥子句)
+* and where certain built-in predicates are translated directly as ZIP instructions (instead of generating calls).  (内建谓词)
+
+Special-purpose instructions are generated in these cases.  (使用优化指令, ref Warren 1977)
+
+The clause `p :- q, r.` compiles into :
+```
+      <code for p> (其参数子项的所有代码)
+      enter n
+      <code for q arguments>
+      call q
+      <code for r arguments>
+      call r 
+      exit 
+```
+
+The `enter` instruction marks the division between the head and body of the clause, and creates a choice point if necessary;
+ argument n (of enter instruction) giving the size of the local stack frame. 
+Each `call` instruction has argument which refers the required procedure. (可以通过 XR 表查找, 或...)
+Finally, `exit` marks the end of the clause, and passes control to the forward continuation. 
+
+Among the optimisations used here are translation of `call exit` sequences 
+into a `depart` (or possibly `proceed`) instruction which handles "last call" optimisation.  (ref Warren 1980)
+
+
+The compilation of terms proceeds as follows:   (项的编译)
+* If the term is atomic, it is translated as `constant n`, ...
+* If the term is a variable, it is translated as `var n`, where n is an offset from the current stack frame register CL.
+* If the term is compound t(a1,...an), translating as:
+```
+    functor f n 
+    code for a1 
+    ...
+    code for an 
+    pop
+```
+The `functor f n` instruction refers to a functor f/n.  
+Code for the n arguments and a housekeeping instruction follow the `functor` instruction. 
+
+The ZIP instruction set listed in the Appendix contains many optimised *variants* of the above instructions,   
+ (这些基础指令的优化变体 列于附录; ref: Warren 1977)
+
+Example concatenate(即 append):
+    append([], L, L).
+    append([X|L1], L2, [X|L3]) :- append(L1,L2,L3).
+compile to:
+```
+    constnil      unify with []   (特化的 functor 指令)
+    skipvar       an optimisation of the first variable L
+    var 9         ... because this one (L) does the work  (?只需一次工作 -- 这里有疑问)
+    return        successfully pass control to continuation, no subgoals
+
+    conslist      unify the list constructor
+    firstvar 13   unify the head (first occurrence of variable X)
+    firstvar 11   unify the tail (first occurrence of variable L1)
+    pop           finished with that term 
+    skipvar       optimisation for variable L2 
+    lastconslist  unify list constructor, no 'pop' needed
+    var 13        head X 
+    firtsvar 12   tail: first occurrence of L3 
+    argmode       an optimised 'enter' (only 1 subgoal)
+    var 11        push first argument L1 
+    var 9           L2 
+    var 12          L3 
+    proceed 1 3    tail-recursive call of 'append'
+```
+(最后的 proceed 指令执行尾递归优化调用) ... reusing the current stack frame.
+
+The actual operation performed by each instruction depends on the context provided by the PM register.  (实际操作与 mode 有关)
+During the execution of the head of a clause, the processor is in `MATCH` mode,    (头部是 match 模式)
+ and each instruction attempts to unify its argument with the arguments of the goal.   (合一 指令参数 vs. 目标参数D)
+Within the code for a term, data structure construction must be performed, 
+ so the processor switches to `COPY` mode so that each instruction can construct its argument by copying. 
+  (项的代码: copy 模式, 因需要构造结构)
+During the execution of the body of a clause, the processor is in ARG mode, and each instruction passes its argument to 
+ the subgoal to be called.  (body 时: arg 模式, 因传参给子目标)
+
+For example, `enter` and its optimised form `argmode` assign mode `ARG` to PM.
+ (理解: SWIPL 中 enter 之前用 H 系列指令, 之后用 B 系列指令)
+The `functor` instruction pushes the contents of PM on a scratchpad stack and sets PM to `COPY`. 
+The matching `pop` instruction restores PM from the scratchpad. 
+
+As an experiment I also implemented a word-coded machine to compare relative performance.  
+ (可选用 word 长度的代码, ~5% ... 需测试的数据)
+... further reducing the instruction dispatching overhead by means of the so-called "threaded code" technique .  
+ (还可使用 threaded-code 技术)
+
+
+# 7. Selection of Clauses
+
+As mentioned above, clauses are compiled separately and are bidirectionally chained. 
+This technique provides easy incremental compilation and modification of the database. 
+ (子句单独编译 放入双向链表, 为了增量编译 方便修改db)
+However, there are some disadvantages of this technique compared with the alternative (Warren 1983)
+ (缺点: 可能执行慢 ...)
+
+In order to compensate for the slower context changing in the ZIP model, we use two techniques to improve clause selection. 
+ (补偿/补救方案 ...)
+The first technique, which is used in other implementations, is to associate a search key with the first argument of a clause. 
+This acts as a. "filter" to reduce the amount of futile(无用的) matching. 
+ (1. 使用子句 key 或称索引)
+The second technique works as follows. H a. clause has been selected, the system then "looks 
+ahead" in the procedure for another clause that might match the goal according 
+to the search key. If no further clause matches, then we have discovered that the  
+selected clause can be executed deterministically (no choice point is necessary).  
+ (2. 使用 look-ahead 方式, 可取消不必要的 choice-point, 确定性执行 )
+
+The techniques gain more purchase on larger programs: we esti
+mate that the number of stacked choice points is more than halved when running 
+programs such as Chat-80. (效果显著, 可减少一半的 choice-point)
+
+
+# 8. Arithmetic Instructions  (暂时略)
+
+...
+
+# 9. Discussion of Storage Allocation
+
+## 9.1 Local Stack
+
+... tail-recursive ...
+In ... special case, which is detected during compilation, space for the affected variables is migrated to the global stack. 
+ (特定情况下, 编译器要决定, 变量需要迁移到 global-stack)
+The instructions generated to perform this task are `glofirvar` and `glovar` (see Appendix A).  (引入执行该任务的指令)
+Migration may not in fact be necessary, and a run-time check determines this.  (在运行时 检查, 其可能不需要)
+
+## 9.2 Global Stack
+
+If it is necessary to garbage collect the global stack, then a normal mark-sweep-reallocate algorithm can be used. 
+ (如果需要, 可使用一般的 mark-sweep-reallocate 算法)
+References to data in the global stack are rooted in the local stack variables. 
+ (全局 glboal-stack 的数据的根 在 local-stack)
+... 更多细节 暂时略 ...  (研究垃圾回收的时候参考)
+
+## 9.3 Heap
+
+Clauses and database entries are stored in the heap using the `assert` and `recordx` predicates, respectively. 
+... and full details of the incremental garbage collection method used are discussed by Clocksin (1984). 
+ (说明子句的垃圾回收问题, 当子句还在使用中, 其不能被回收. 为此需要一些标志或引用计数计数...)
+
+...
+
+Because clauses are compiled into the database, the time taken to execute a 
+record is greater than if clauses were copied as terms into the database. For this 
+reason, a small, fast compiler, which does no optimisations, is used for recording 
+instead of the usual compiler (used for asserting). 
+ (有一个非优化的编译器 用于 record)
+Having unoptimised code, which may occupy twice the space of optimised code, is justified by the temporary nature 
+of recorded terms.   (非优化的代码可能两倍大, 但对于临时记录 是合理的)
+...
+This technique is fully described in Clocksin (1984).    (?参见 Clocksin 1984)
+
+
+# 10. Problems with Storage Management
+
+The strict Prolog execution model permits the use of stack-like memory management, 
+ with which storage is reclaimed immediately upon backtracking. 
+ (严格的Prolog执行模型允许使用类似栈的内存管理, 在回溯时立即回收的存储空间。)
+...
+
+Despite the advantages of stack-like storage management used by Prolog-X, 
+ there are two problems with this method.   (但有两个问题...)
+First, certain Prolog programming techniques rely on never backtracking, using Prolog goals to simulate perpetual processes 
+ which communicate via shared variables.  
+ (问题1: 某些程序永不回溯, ...)
+The second problem arises from another recent trend, that of mixed-language programming with shared data structures. 
+ (问题2: 混合语言编程, 相互调用, 共享数据结构... )
+The ZIP machine, on the other hand, is tailored so exclusively ... (为 prolog 专门设计, 用于别的语言不太可能)
+
+# Acknowledgements
+
+The work reported here owes much to preliminary design effort in collaboration 
+with Lawrence Byrd, a discussion with David Warren, and to much good advice 
+contributed by Richard O'Keefe and Arthur Norman. Transporting the first version 
+of Prolog-X to the ICL 2980 under VME was done by Paul Cager, Alan Reiblein, 
+and Jim Doores of ICL. Transporting the second version of Prolog-X to the IBM 
+3081 was done by Alan Mycroft. 
+
+
+# References
+
+(给出部分)
+* "A portable Prolog compiler".   Bowen, D L, Byrd, L M, and Clocksin, W F, 1983
+* "Implementation techniques for Prolog databases."   Clocksin, W F, 1984.
+* "Implementing Prolog -compiling logic programs."   Warren, D H D, 1977
+* "An improved Prolog implementation which optimises tail-recursion"    Warren, D H D, 1980.
+* "Perpetual processes -an unexploited Prolog technique"   Warren, D H D, 1982  (永久进程)
+* "An abstract Prolog instruction set"   Warren, D H D, 1983
+* "The design and implementation of a personal sequential inference machine: PSI."   Yokota, M, Yamamoto, A, Taki, K, Nishikawa, H, and Uchida, S, 1983.
+
+
+
+
+# Appendix
+
+A complete list of the ZIP instructions is given in the table below. 
+
+
+```
+--- 常量,函子 ---
+  constant n        % unify constant
+  immed a           % unify constant small integer 
+  constnil          % unify the constant '[]'
+  functor n a       % unify functor of arity a
+  lastfunctor n a   % unify last functo in a nested term 
+  conslist          % unify the functor '.' of arity 2
+  lastconslist      % unify the last functor '.' of arity 2 in a nested term
+--- 变量 ---
+  void              % unify an anouymous variable   (匿名变量)
+  voidn a           % unify a consecutive anonymous variables
+  skipvar           % unify first occurrence of an argument variable  (参数变量 首次)
+  skipvn a          % unify a consecutive first occurrence of argument variables 
+  firstvar v        % unify first occurrence of local or temporary variable  (局部变量 首次)
+  glofirstvar v     % unify first occurrence of varialbe in last goal   (?出现在最后 goal 的变量, 可能需要迁移到 global)
+  glovar v          % unify subsequent occurrence of variable in last goal 
+  var v             % unify subsequent occurrence variable 
+---
+  pop               % complete a compound term 
+  popmatch          % complete a compound term in the head of a clause 
+  poparg            % complete a compound term in the body of a clause 
+---
+  proceed n a       % call the only goal in a clause 
+  depart n a        % call the last goal in a clause 
+  call n            % call a goal 
+  callx v           % convert a term to a goal and call it 
+  return a          % the neck of a unit clause 
+  argmode a         % the neck of a doublet clause 
+  enter a           % the neck of a clause 
+  exit              % end a clause having an open-coded last goal 
+---
+  cut 
+  fail 
+--- 内置谓词
+  provar v          % compiled var(X)    
+  ... 平凡的, 暂时略 ...
+--- 数学
+  ... 平凡的, 暂时略 ...
+
+```
+
+# End
