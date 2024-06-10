@@ -1,7 +1,7 @@
-# mynextjspage
-test to publish next.js to github pages
+# Welcome
+test to publish next.js on my github pages.
 
-To visit: https://liujunxing.github.io/my-nextjs-app2/
+To visit: https://liujunxing.github.io/
 
 
 
