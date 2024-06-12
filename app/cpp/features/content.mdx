@@ -1,0 +1,305 @@
+Quick Note: C++11 ~ 26 Features
+
+# C++ 11
+
+URL: [https://en.cppreference.com/w/cpp/11](https://en.cppreference.com/w/cpp/11)
+
+## Core language features
+
+* auto and decltype
+
+```C++
+  auto x = 1;   // int 
+  auto f() -> int;  // f() returns int
+```
+
+* defaulted and deleted functions 
+
+```C++
+  struct foo {
+    foo() = default;
+    foo(const foo&) = delete;
+  };
+```
+
+
+* final and override
+
+```c++
+  struct A final {};   
+  struct Base {
+    virtual void foo();
+    virtual void bar();
+  };
+  struct B : public Base {
+    void foo() override;  // override Base::foo
+    void bar() final;     // Base::foo is overridden and B::foo is the final override
+  };
+```
+
+* trailing return type 
+
+```c++
+  auto f(int b) -> int;  // returning int
+```
+
+* rvalue references
+
+Rvalue reference declarator: the declaration `S&& D`; Rvalue references can be used to extend the lifetimes of temporary objects.
+
+More importantly, when a function has both rvalue reference and lvalue reference overloads, 
+ the rvalue reference overload binds to rvalues (including both prvalues and xvalues), while the lvalue reference overload binds to lvalues.
+
+This allows move constructors, move assignment operators, and other move-aware functions (e.g. `std::vector::push_back()`) to be automatically selected when suitable.
+This makes it possible to move out of an object in scope that is no longer needed. (实现移动语义)
+
+
+```c++
+  void f(int& x);
+  void f(int&& x);   // rvalue reference overload f.   f(3) calls f(int&&).
+  std::vector<int> v1{2,3,5,7};
+  std::vector<_> v2(std::move(v1));  // move v1 data to v2
+```
+
+* move constructors and move assignment operators 
+
+```c++
+  struct X {
+    X(X&& other);             // move constructor
+    X& operator=(X&& other);  // move assignment operator
+  };
+```
+
+
+* scoped enum
+
+... which is contained within the scope of the enumeration, and can be accessed using scope resolution operator.
+
+```c++
+  enum class color { red, green, blue };
+  color c = color::red;
+```
+
+
+* constexpr and literal types
+
+Literal types are the types of constexpr variables and they can be constructed, manipulated, and returned from constexpr functions.
+ ...(需要满足一些条件)
+
+```c++
+  constexpr int f() { return 0; }
+  constexpr int v1 = f();   // f() is a constant expression
+
+  class conststr {  // conststr is a literal type
+    const char *p; size_t sz;
+  public:
+    constexpr char operator[](size_t n) const { return n < sz ? p[n] : throw out_of_range; }
+    constexpr size_t size() const { return sz; }
+  };
+
+```
+
+* list-initialization
+
+Initializes an object from braced-init-list. (分两种 Direct-list-initialization and Copy-list-initialization)
+...
+
+* delegating and inherited constructors
+
+If the name of the class itself appears as class-or-identifier in the member initializer list, then the list must consist of that one member initializer only; 
+such a constructor is known as the *delegating constructor*, and the constructor selected by the only member of the initializer list is the *target constructor*.
+
+```c++
+  struct Foo {
+    Foo(char x, int y) {}
+    Foo(int y) : Foo('a', y) {} // Foo(int) delegates to Foo(char, int)
+  };
+```
+
+If the using-declaration refers to a constructor of a direct base of the class being defined (e.g. using Base::Base;), 
+all constructors of that base (ignoring member access) are made visible to overload resolution when initializing the derived class.
+
+* brace-or-equal initializers
+
+It's literally what it says on the tin: an initializer of the form = something ("equals") or \{ something \} ("brace"). 
+In other words, it excludes the ( something ) form of initializers.
+
+
+* nullptr
+略
+
+* long long
+
+target type will have width of at least 64 bits.
+
+* char16_t and char32_t
+
+char16_t — type for UTF-16 character representation. \
+char32_t — type for UTF-32 character representation. \
+char8_t — type for UTF-8 character representation.
+
+* type aliases
+
+Type alias is a name that refers to a previously defined type (similar to typedef).
+
+```c++
+  using ptr = void *;
+  template<class T> struct Alloc{};
+  template<class T> 
+  using Vec = vector<T, Alloc<T>>;   // Vec<int> is vector<int, Alloc<int>>
+```
+
+* variadic templates
+
+A template parameter pack is a template parameter that accepts zero or more template arguments (non-types, types, or templates). 
+A function parameter pack is a function parameter that accepts zero or more function arguments.
+
+A template with at least one parameter pack is called a *variadic template*. see: https://en.cppreference.com/w/cpp/language/parameter_pack
+
+```c++
+template<class... Types>
+struct Tuple {
+  void f(Types... args);
+};
+```
+
+* generalized (non-trivial) unions
+
+If a union contains a non-static data member with a non-trivial special member function (copy/move constructor, copy/move assignment, or destructor), 
+that function is deleted by default in the union and needs to be defined explicitly by the programmer. 
+ (现在 union 可以含带有构造析构的成员, 以前不允许非 POD 类型)
+
+If a union contains a non-static data member with a non-trivial default constructor, the default constructor of the union is deleted 
+by default unless a variant member of the union has a default member initializer.
+
+* generalized PODs (trivial types and standard-layout types)
+
+see: is_pod, is_trivial, is_standard_layout.
+
+* Unicode string literals
+
+utf8 string literal: u8"s-char-seq(optional)"	
+```c++
+  char8_t s[] = u8"abc";
+  std::wstring message = L"你好，世界！";
+  std::u32string message = U"你好，世界！";
+```
+
+* user-defined literals
+
+Allows integer, floating-point, character, and string literals to produce objects of user-defined type by defining a user-defined suffix.
+
+```c++
+  long double operator ""_w(long double);
+  std::string operator ""_w(const char16_t*, size_t);
+  1.2_w;        // call operator ""_w(1.2L);
+  u"one"_w;     // call operator ""_w(u"one", 3)
+```
+
+* attributes
+
+syntax: [[ attribute-list ]]
+
+```c++
+  [[noreturn]]
+  [[carries_dependency]](C++11)	 indicates that dependency chain in release-consume std::memory_order propagates in and out of the function
+  [[deprecated]] 
+  [[fallthrough]]
+  [[nodiscard]]
+  ...
+
+  [[gnu::always_inline]] [[gnu::hot]] [[gnu::const]] [[nodiscard]]
+  inline int f(); // declare f with four attributes
+   
+```
+
+* lambda expressions
+
+```c++
+  // generic lambda, operator() is a template with two parameters
+  auto glambda = [](auto a, auto&& b) { return a < b; };
+
+  // generic lambda, operator() is a template with one parameter
+  auto vglambda = [](auto printer)  {
+      // generic lambda, ts is a parameter pack
+      return [=](auto&&... ts) { 
+          printer(std::forward<decltype(ts)>(ts)...);
+          // nullary lambda (takes no parameters):
+          return [=] { printer(ts...); };
+      };
+  };
+
+```
+
+* noexcept specifier and noexcept operator
+
+Specifies whether a function could throw exceptions.
+
+
+```c++
+  void f() noexcept; // the function f() does not throw
+  void g() noexcept(false);
+```
+
+* alignof and alignas
+
+alignof: Queries alignment requirements of a type. \
+alianas: Specifies the alignment requirement of a type or an object.
+
+```c++
+  // Note: `alignas(alignof(long double))` below can be simplified to simply 
+  // `alignas(long double)` if desired.
+  struct alignas(alignof(long double)) Foo
+  {
+      // put your definition here
+  }; 
+```
+
+* multithreaded memory model
+
+...复杂的, 需单立...
+
+* thread-local storage
+
+The storage for the object is allocated when the thread begins and deallocated when the thread ends. 
+Each thread has its own instance of the object. Only objects declared thread_local have this storage duration.
+
+* GC interface (removed in c++ 23)
+略
+
+* range-for (based on a Boost library)
+
+Executes a for loop over a range.
+
+Used as a more readable equivalent to the traditional for loop operating over a range of values, such as all elements in a container.
+
+```c++
+  for (int i : {1, 2, 3}) { ... }
+
+  for (auto&& [first, second] : mymap) {
+    // use first and second
+  }  
+```
+
+* static_assert (based on a Boost library)
+
+syntax: static_assert( bool-constexpr , unevaluated-string? )	
+
+```c++
+  static_assert(std::is_default_constructible_v<T>, "Requires default-constructible elements");
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# END 

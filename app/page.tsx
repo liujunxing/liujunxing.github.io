@@ -116,6 +116,7 @@ export default function Home() {
       <h2>Welcome</h2>
       <div>
         <ul>
+          <li><Link href="./cpp/features">SUMMARY: C++ 11~26 features</Link></li>
           <li><Link href="./prolog/dsspm">READ: Design and Simulation of a Sequential Prolog Machine</Link></li>
           {/* <li><Link href="./prolog/yfx">yfx</Link></li> */}
           <li><Link href="./taupro">tau-prolog</Link></li>
