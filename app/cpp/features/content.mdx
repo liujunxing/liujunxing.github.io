@@ -1,6 +1,7 @@
 Quick Note: C++11 ~ 26 Features
 
 # C++ 11
+------------------------------------------------------------------------------------
 
 URL: [https://en.cppreference.com/w/cpp/11](https://en.cppreference.com/w/cpp/11)
 
@@ -290,16 +291,127 @@ syntax: static_assert( bool-constexpr , unevaluated-string? )
 ```
 
 
+## Library features 
+
+(只列出重要的几个)
+
+* atomic  `std::atomic<T>`
+* condition_varialbe
+* future 
+* regex 
+* thread 
+* type_traits
+* unordered_map/set 
+* concurrency support library 
+* ratio 
+* new algorithm ...
+* `std::function`
+
+
+# C++ 14
+------------------------------------------------------------------------------------
+
+## New language features 
+
+* variable templates 
+
+A variable template defines a family of variables or static data members.
+
+```c++
+  template<class T>
+  constexpr T pi = T(3.1415926L);   // variable template
+```
+
+* generic lambdas 
+
+```c++
+  // template<T> ret operator()(params) { body }
+
+  // generic lambda, operator() is a template with two parameters
+  auto glambda = [](auto a, auto&& b) { return a < b;}
+```
+
+* lambda init-capture 
+
+https://github.com/peter-can-write/cpp-notes/blob/master/lambda-init-capture.md
+
+```c++
+  // This will basically move the pointer object into the data member ‘p’ of the closure class created from the lambda. In C++11, this was not possible.
+  auto pointer = std::make_unique(5);
+  auto lambda = [p = std::move(pointer)] () { return *p + 5; };
+```
+
+* new/delete elision
+
+"new/delete elision" 是指在一些情况下，编译器会自动优化代码，将使用 "new" 运算符分配内存的对象直接放在栈上，而不是在堆上进行动态内存分配，从而避免了动态内存分配和释放的开销。
+
+```c++
+  todo: example
+```
+
+* relaxed restrictions on constexpr functions 
+
+for details see: https://en.cppreference.com/w/cpp/language/constexpr
+
+```c++
+  // C++11 constexpr functions use recursion rather than iteration
+  constexpr int factorial(int n)
+  {
+      return n <= 1 ? 1 : (n * factorial(n - 1));
+  }
+
+  // C++14 constexpr functions may use local variables and loops
+  #if __cplusplus >= 201402L
+  constexpr int factorial_cxx14(int n)
+  {
+      int res = 1;
+      while (n > 1)
+          res *= n--;
+      return res;
+  }
+  #endif // C++14
+```
+
+* binary literals 
+
+integer syntax:  binary-literal integer-suffix(optional)	(4)	(since C++14)
+```c++
+  int b = 0b101010; // C++14
+```
+
+* digit separators 
+
+Optional single quotes (') may be inserted between the digits as a separator; they are ignored when determining the value of the literal.
+```c++
+  unsigned long long l2 = 18'446'744'073'709'550'592llu; // C++14
+```
+
+* return type deduction for functions 
+
+
+```c++
+  auto f1() { return x; }        // return type is int
+  decltype(auto) f2() { return x; }  // return type is int, same as decltype(x)
+  auto f3() {}              // returns void
+```
+
+* aggregate classes with default non-static member initializers 
+
+(?放松对 aggregate classes 的要求?)
+
+todo: example
+
+
+## New library features 
+
+* std::make_unique 
+* std::shared_lock
+...
 
 
 
-
-
-
-
-
-
-
+# C++ 17
+------------------------------------------------------------------------------------
 
 
 # END 
